@@ -31,10 +31,10 @@ model_path = os.path.join(os.path.dirname(__file__), 'best_model_fs_heaving.pt')
 model.load_state_dict(torch.load(model_path, map_location='cpu'))
 model.eval()
 
-
 @app.route('/')
 def index():
-    return "Hello from Levee Predictor!"
+    return render_template('index.html')
+
 
 
 @app.route('/predict', methods=['POST'])

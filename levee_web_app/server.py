@@ -7,7 +7,7 @@ app = Flask(__name__)
 
 # ====== Model Definition ======
 class FSHeavingModel(torch.nn.Module):
-    def __init__(self, input_dim=1, hidden_dim=128, num_layers=3, output_dim=80, dropout=0.3):
+    def __init__(self, input_dim=1, hidden_dim=32, num_layers=1, output_dim=80, dropout=0.2):
         super().__init__()
         self.lstm = torch.nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True, dropout=dropout)
         self.attn = torch.nn.Linear(hidden_dim, 1)

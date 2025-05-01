@@ -11,12 +11,23 @@ def index():
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    data = request.json
-    response = requests.post(
-        "https://aping1100--fs-heaving-api-serve.modal.run/predict",
-        json=data
-    )
-    return jsonify(response.json())
+    try:
+        data = request.get_json()
+        if not data or 'water_levels' not in data:
+            return jsonify({'error': 'Missing water_levels in request'}), 400
+
+        response = requests.post(
+            "https://aping1100--fs-heaving-api-serve.modal.run/predict",
+            json=data,
+            timeout=60
+        )
+        response.raise_for_status()
+        return jsonify(response.json())
+
+    except Exception as e:
+        # Log and return HTML-safe error message
+        print("❌ Flask /predict error:", e)
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':

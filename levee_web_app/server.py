@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, render_template
 import torch
 import numpy as np
 import os
-
+import requests
 app = Flask(__name__)
 
 # ====== Model Definition ======
@@ -39,25 +39,23 @@ def index():
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    data = request.json
-    water_levels = np.array(data['water_levels']).astype(np.float32)
+    data = request.json  # 只需要 water_levels
 
-    # Interpolate water levels to 40 points
-    wl40 = np.interp(np.linspace(1, 20, 40), np.arange(1, 21), water_levels)
-    wl_tensor = torch.tensor(wl40).reshape(1, 40, 1)  # [batch, seq_len, input_dim=1]
+    try:
+        # 送出請求到 Modal 上的 GPU 模型
+        response = requests.post(
+            "https://aping1100--fs-heaving-api-serve.modal.run/predict",
+            json=data,
+            timeout=60
+        )
+        response.raise_for_status()
 
-    with torch.no_grad():
-        output = model(wl_tensor.float())
+        # Modal 已經幫你做完 FS1, FS2 處理
+        result = response.json()
+        return jsonify(result)
 
-    output = output.squeeze().numpy()
-    fs1 = np.clip(output[:40], 0, 5)
-    fs2 = np.clip(output[40:], 0, 5)
-
-    return jsonify({
-        'fs1': fs1.tolist(),
-        'fs2': fs2.tolist(),
-        'water_level': wl40.tolist()
-    })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))  # Important for cloud hosting

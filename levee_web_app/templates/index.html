@@ -189,7 +189,7 @@ function predict() {
   }
   const waterData = interpolateWaterLevels(waterDataOriginal);
 
-fetch('https://aping1100--fs-heaving-api-serve.modal.run/predict', {
+fetch('/predict', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ water_levels: waterDataOriginal })

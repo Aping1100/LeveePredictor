@@ -3,6 +3,9 @@ import torch
 import numpy as np
 import os
 import requests
+from flask_cors import CORS
+CORS(app)
+
 app = Flask(__name__)
 
 # ====== Model Definition ======

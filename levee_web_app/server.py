@@ -12,16 +12,12 @@ def index():
 @app.route('/predict', methods=['POST'])
 def predict():
     data = request.json
-    try:
-        response = requests.post(
-            "https://aping1100--fs-heaving-api-serve.modal.run/predict",
-            json=data,
-            timeout=60
-        )
-        response.raise_for_status()
-        return jsonify(response.json())
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    response = requests.post(
+        "https://aping1100--fs-heaving-api-serve.modal.run/predict",
+        json=data
+    )
+    return jsonify(response.json())
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

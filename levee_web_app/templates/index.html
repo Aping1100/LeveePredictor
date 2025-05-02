@@ -194,6 +194,18 @@ fetch('/predict', {
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ water_levels: waterDataOriginal })
 })
+.then(response => response.json())
+.then(data => {
+  if (data.error) {
+    alert("⚠️ Error: " + data.error);
+    return;
+  }
+  // 繪圖等後續處理
+})
+.catch(err => {
+  alert("❌ Network error: " + err.message);
+});
+
 
   .then(response => response.json())
   .then(data => {

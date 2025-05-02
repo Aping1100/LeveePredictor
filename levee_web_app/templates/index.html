@@ -101,7 +101,10 @@
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
 <script>
 const map = L.map('map').setView([41.2877, -75.8678], 15);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+
 const leveeSites = [
   {lat:41.2877, lng:-75.8678, name:"Site 2", image:"/static/images/site2.png"},
   {lat:41.2608, lng:-75.8767, name:"Site 3", image:"/static/images/site3.png"},
@@ -189,26 +192,18 @@ function predict() {
   }
   const waterData = interpolateWaterLevels(waterDataOriginal);
 
-fetch('/predict', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ water_levels: waterDataOriginal })
-})
-.then(response => response.json())
-.then(data => {
-  if (data.error) {
-    alert("⚠️ Error: " + data.error);
-    return;
-  }
-  // 繪圖等後續處理
-})
-.catch(err => {
-  alert("❌ Network error: " + err.message);
-});
-
-
+  fetch('/predict', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ water_levels: waterDataOriginal })
+  })
   .then(response => response.json())
   .then(data => {
+    if (data.error) {
+      alert("⚠️ Error: " + data.error);
+      return;
+    }
+
     document.getElementById('predict-result').style.display = 'block';
     document.getElementById('predict-result').scrollIntoView({behavior: 'smooth'});
 
@@ -216,7 +211,6 @@ fetch('/predict', {
     if (window.chart) window.chart.destroy();
 
     const labels = Array.from({length: 40}, (_, i) => (i + 1) / 2);
-
     const fs1Data = data.fs1.map((v, i) => ({ x: labels[i], y: v }));
     const fs2Data = data.fs2.map((v, i) => ({ x: labels[i], y: v }));
     const waterLevelData = waterData.map((v, i) => ({ x: labels[i], y: v }));
@@ -315,6 +309,9 @@ fetch('/predict', {
     } else {
       summary.innerHTML = `<span style='color:green;font-weight:bold;'>✅ Safe</span>`;
     }
+  })
+  .catch(err => {
+    alert("❌ Network error: " + err.message);
   });
 }
 

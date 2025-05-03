@@ -27,6 +27,7 @@ class FSHeavingModel(torch.nn.Module):
 model = FSHeavingModel()
 model.load_state_dict(torch.load("best_model_fs_heaving.pt", map_location=torch.device("cpu")))
 model.eval()
+from flask import Flask, request, jsonify, render_template
 
 # ====== Serve index.html ======
 @app.route("/")

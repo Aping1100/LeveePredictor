@@ -7,22 +7,21 @@ CORS(app)  # Enable CORS if frontend is hosted separately
 
 # Proxy endpoint for prediction
 @app.route('/predict', methods=['POST'])
+@app.route('/predict', methods=['POST'])
 def predict_proxy():
     modal_url = 'https://aping1100--fs-heaving-api-serve.modal.run/predict'
     try:
-        print("[INFO] Received prediction request")
-        print("Data sent:", request.json)
-
         resp = requests.post(modal_url, json=request.json, timeout=15)
         resp.raise_for_status()
-        response_data = resp.json()
-        
-        print("[INFO] Response from Modal API:", response_data)
-        return jsonify(response_data)
-
+        return jsonify(resp.json())
+    except requests.exceptions.HTTPError as http_err:
+        # ➕ 印出 status code 和 response 內容
+        print(f"[ERROR] HTTPError: {http_err}")
+        print(f"[ERROR] Response text: {http_err.response.text}")
+        return jsonify({'error': f"Modal error {http_err.response.status_code}: {http_err.response.text}"}), 500
     except requests.exceptions.RequestException as e:
-        print(f"[ERROR] Failed to connect to Modal API: {e}")
-        return jsonify({'error': 'Failed to connect to prediction server. Please try again later.'}), 500
+        print(f"[ERROR] RequestException: {e}")
+        return jsonify({'error': str(e)}), 500
 
 # Home route
 @app.route('/')

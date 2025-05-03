@@ -1,12 +1,11 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask import Flask, request, jsonify, send_from_directory
 import torch
 import numpy as np
+import os
 
-app = Flask(__name__)
-CORS(app)  # 若前後端分開部署建議加上
+app = Flask(__name__, static_folder="static", static_url_path="")
 
-# === Define Model ===
+# ====== Model Definition ======
 class FSHeavingModel(torch.nn.Module):
     def __init__(self, input_dim=1, hidden_dim=128, num_layers=3, output_dim=80, dropout=0.3):
         super().__init__()
@@ -17,18 +16,24 @@ class FSHeavingModel(torch.nn.Module):
             torch.nn.ReLU(),
             torch.nn.Linear(hidden_dim // 2, output_dim)
         )
+
     def forward(self, x):
         lstm_out, _ = self.lstm(x)
         w = torch.softmax(self.attn(lstm_out).squeeze(-1), dim=1)
         ctx = torch.bmm(w.unsqueeze(1), lstm_out).squeeze(1)
         return self.fc(ctx)
 
-# === Load Model ===
+# ====== Load Model ======
 model = FSHeavingModel()
 model.load_state_dict(torch.load("best_model_fs_heaving.pt", map_location=torch.device("cpu")))
 model.eval()
 
-# === API Endpoint ===
+# ====== Serve index.html ======
+@app.route("/")
+def index():
+    return send_from_directory("static", "index.html")
+
+# ====== Predict API ======
 @app.route("/predict", methods=["POST"])
 def predict():
     try:
@@ -37,20 +42,13 @@ def predict():
         levels_tensor = torch.tensor(levels)
         with torch.no_grad():
             pred = model(levels_tensor).numpy().flatten()
-        return jsonify({
-            "fs1": pred[:40].tolist(),
-            "fs2": pred[40:].tolist()
-        })
+            return jsonify({
+                "fs1": pred[:40].tolist(),
+                "fs2": pred[40:].tolist()
+            })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-from flask import send_from_directory
-
-@app.route("/")
-def serve_index():
-    return send_from_directory("static", "index.html")
-
-
-# === Main Run ===
+# ====== Run Locally ======
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)

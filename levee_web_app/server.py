@@ -5,23 +5,26 @@ import torch.nn as nn
 import os
 
 
-class FSHeavingModel(nn.Module):
-    def __init__(self, input_dim=1, hidden_dim=128, output_dim=80):
+
+# ====== Model Definition ======
+class FSHeavingModel(torch.nn.Module):
+    def __init__(self, input_dim=1, hidden_dim=128, num_layers=3, output_dim=80, dropout=0.3):
         super().__init__()
-        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers=3, batch_first=True, dropout=0.3)
-        self.attn = nn.Linear(hidden_dim, 1)  # ⚠️ 請注意：這裡是 [1, 128] 權重，所以 out_features=1
-        self.fc = nn.Sequential(
-            nn.Linear(hidden_dim, 64),
-            nn.ReLU(),
-            nn.Linear(64, output_dim)
+        self.lstm = torch.nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True, dropout=dropout)
+        self.attn = torch.nn.Linear(hidden_dim, 1)
+        self.fc = torch.nn.Sequential(
+            torch.nn.Linear(hidden_dim, hidden_dim // 2),
+            torch.nn.ReLU(),
+            torch.nn.Linear(hidden_dim // 2, output_dim)
         )
 
     def forward(self, x):
         lstm_out, _ = self.lstm(x)
-        attn_weights = torch.sigmoid(self.attn(lstm_out))  # (B, T, 1)
-        context = lstm_out * attn_weights  # broadcasting
-        out = self.fc(context[:, -1, :])  # last timestep
-        return out
+        w = torch.softmax(self.attn(lstm_out).squeeze(-1), dim=1)
+        ctx = torch.bmm(w.unsqueeze(1), lstm_out).squeeze(1)
+        return self.fc(ctx)
+
+
 
 
 

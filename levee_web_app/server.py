@@ -22,8 +22,8 @@ CORS(app)
 
 # === Load model ===
 model = FSHeavingModel()
-model.load_state_dict(torch.load("best_model_fs_heaving.pt
-", map_location=torch.device("cpu")))
+model.load_state_dict(torch.load("best_model_fs_heaving.pt", map_location=torch.device("cpu")))
+
 model.eval()
 
 # === Serve index.html ===

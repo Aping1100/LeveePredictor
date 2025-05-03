@@ -192,9 +192,10 @@ function predict() {
   }
   const waterData = interpolateWaterLevels(waterDataOriginal);
 
-  const baseURL = location.hostname === "localhost"
-    ? "http://localhost:8080"
-    : "https://leveepredictor-production.up.railway.app/"; // 🔁 把這裡改成你自己的 Railway 網址
+const baseURL = location.hostname === "localhost"
+  ? "http://localhost:8080"
+  : "https://leveepredictor-production.up.railway.app/";
+
 
   console.log("📤 Sending fetch to", `${baseURL}/predict`, waterDataOriginal);
 

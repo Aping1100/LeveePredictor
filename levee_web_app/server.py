@@ -4,17 +4,24 @@ import torch
 import torch.nn as nn
 import os
 
-# === Define model ===
 class FSHeavingModel(nn.Module):
-    def __init__(self):
+    def __init__(self, input_dim=1, hidden_dim=128, num_layers=3, output_dim=80, dropout=0.3):
         super().__init__()
-        self.lstm = nn.LSTM(input_size=1, hidden_size=128, num_layers=3, batch_first=True)
-        self.fc = nn.Linear(128, 80)  # output 80 FS points (40 for fs1 + fs2)
+        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True, dropout=dropout)
+        self.attn = nn.Linear(hidden_dim, hidden_dim)
+        self.fc = nn.Sequential(
+            nn.Linear(hidden_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128, output_dim)
+        )
 
     def forward(self, x):
-        out, _ = self.lstm(x)
-        out = self.fc(out[:, -1, :])
+        lstm_out, _ = self.lstm(x)
+        attn_weights = torch.sigmoid(self.attn(lstm_out))
+        context = lstm_out * attn_weights
+        out = self.fc(context[:, -1, :])  # use last time step
         return out
+
 
 # === Init app ===
 app = Flask(__name__, static_folder='static', static_url_path='')

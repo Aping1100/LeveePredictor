@@ -194,7 +194,7 @@ function predict() {
 
   const baseURL = location.hostname === "localhost"
     ? "http://localhost:8080"
-    : "https://your-backend-url.railway.app"; // 🔁 把這裡改成你自己的 Railway 網址
+    : "https://leveepredictor-production.up.railway.app/"; // 🔁 把這裡改成你自己的 Railway 網址
 
   console.log("📤 Sending fetch to", `${baseURL}/predict`, waterDataOriginal);
 

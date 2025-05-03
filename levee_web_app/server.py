@@ -1,12 +1,9 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import torch
-import torch.nn as nn
-import os
+import numpy as np
 
-
-
-# ====== Model Definition ======
+# === Define your model here ===
 class FSHeavingModel(torch.nn.Module):
     def __init__(self, input_dim=1, hidden_dim=128, num_layers=3, output_dim=80, dropout=0.3):
         super().__init__()
@@ -24,54 +21,39 @@ class FSHeavingModel(torch.nn.Module):
         ctx = torch.bmm(w.unsqueeze(1), lstm_out).squeeze(1)
         return self.fc(ctx)
 
-
-
-
-
-# === Init app ===
-app = Flask(__name__, static_folder='static', static_url_path='')
+# === App setup ===
+app = Flask(__name__)
 CORS(app)
 
 # === Load model ===
 model = FSHeavingModel()
 model.load_state_dict(torch.load("best_model_fs_heaving.pt", map_location=torch.device("cpu")))
-
 model.eval()
 
-# === Serve index.html ===
-@app.route('/')
-def index():
-    return app.send_static_file('index.html')
-
-# === API Endpoint ===
-@app.route('/predict', methods=['POST'])
+# === /predict endpoint ===
+@app.route("/predict", methods=["POST"])
 def predict():
-    try:
-        data = request.get_json()
-        levels = data.get('water_levels', [])
-        if len(levels) != 20:
-            return jsonify({'error': '20 water level values required.'}), 400
+    data = request.get_json()
+    water_levels = np.array(data["water_levels"], dtype=np.float32)
+    interpolated = []
 
-        # Interpolate to 40 points
-        interpolated = []
-        for i in range(19):
-            interpolated.append(levels[i])
-            interpolated.append((levels[i] + levels[i+1]) / 2)
-        interpolated.append(levels[-1])
+    for i in range(len(water_levels) - 1):
+        interpolated.append(water_levels[i])
+        interpolated.append((water_levels[i] + water_levels[i+1]) / 2)
+    interpolated.append(water_levels[-1])
 
-        input_tensor = torch.tensor(interpolated, dtype=torch.float32).view(1, -1, 1)
+    # (1, 40, 1)
+    x = torch.tensor(interpolated).view(1, -1, 1)
 
-        with torch.no_grad():
-            output = model(input_tensor).view(-1)
+    with torch.no_grad():
+        y_pred = model(x).numpy().flatten()
 
-        fs1 = output[:40].tolist()
-        fs2 = output[40:].tolist() if len(output) >= 80 else fs1  # fallback if only 40 outputs
+    # Split output into two sets (FS1_AB and FS2_CD) each with 40 values
+    fs1 = y_pred[:40].tolist()
+    fs2 = y_pred[40:].tolist() if len(y_pred) == 80 else fs1  # fallback in case only one output
 
-        return jsonify({'fs1': fs1, 'fs2': fs2})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    return jsonify({"fs1": fs1, "fs2": fs2})
 
-# === Start app ===
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port)
+# === Required for Railway ===
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8080)

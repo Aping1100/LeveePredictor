@@ -183,7 +183,7 @@ function interpolateWaterLevels(data) {
   result.push(data[data.length-1]);
   return result;
 }
-
+let isPredicting = false;
 function predict() {
   const waterDataOriginal = getTableData();
   if (waterDataOriginal.length !== 20) {

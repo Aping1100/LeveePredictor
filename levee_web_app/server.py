@@ -3,7 +3,8 @@ import torch
 import numpy as np
 import os
 
-app = Flask(__name__, static_folder="static", static_url_path="")
+app = Flask(__name__, static_folder='static', template_folder='templates')
+
 
 # ====== Model Definition ======
 class FSHeavingModel(torch.nn.Module):

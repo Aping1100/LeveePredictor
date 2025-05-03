@@ -1,10 +1,12 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import torch
 import numpy as np
 
 app = Flask(__name__)
+CORS(app)  # 若前後端分開部署建議加上
 
-# === Load model ===
+# === Define Model ===
 class FSHeavingModel(torch.nn.Module):
     def __init__(self, input_dim=1, hidden_dim=128, num_layers=3, output_dim=80, dropout=0.3):
         super().__init__()
@@ -21,23 +23,32 @@ class FSHeavingModel(torch.nn.Module):
         ctx = torch.bmm(w.unsqueeze(1), lstm_out).squeeze(1)
         return self.fc(ctx)
 
+# === Load Model ===
 model = FSHeavingModel()
 model.load_state_dict(torch.load("best_model_fs_heaving.pt", map_location=torch.device("cpu")))
 model.eval()
 
-# === Predict endpoint ===
+# === API Endpoint ===
 @app.route("/predict", methods=["POST"])
 def predict():
-    data = request.get_json()
-    levels = np.array(data["water_levels"]).reshape(1, -1, 1).astype(np.float32)
-    levels_tensor = torch.tensor(levels)
-    with torch.no_grad():
-        pred = model(levels_tensor).numpy().flatten()
+    try:
+        data = request.get_json()
+        levels = np.array(data["water_levels"]).reshape(1, -1, 1).astype(np.float32)
+        levels_tensor = torch.tensor(levels)
+        with torch.no_grad():
+            pred = model(levels_tensor).numpy().flatten()
         return jsonify({
             "fs1": pred[:40].tolist(),
             "fs2": pred[40:].tolist()
         })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-# === Run server ===
+# === Home Page Check ===
+@app.route("/", methods=["GET"])
+def home():
+    return "✅ Levee Predictor backend is running."
+
+# === Main Run ===
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)

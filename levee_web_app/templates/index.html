@@ -194,7 +194,8 @@ function predict() {
 
 console.log("📤 Sending fetch to /predict", waterDataOriginal);
 
-fetch('/predict', {
+fetch('https://leveepredictor-production.up.railway.app/', {
+
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ water_levels: waterDataOriginal })

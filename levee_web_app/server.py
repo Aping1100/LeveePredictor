@@ -30,8 +30,8 @@ model.eval()
 
 # ====== Serve index.html ======
 @app.route("/")
-def index():
-    return send_from_directory("static", "index.html")
+def home():
+    return render_template("index.html")
 
 # ====== Predict API ======
 @app.route("/predict", methods=["POST"])

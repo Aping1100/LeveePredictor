@@ -39,16 +39,52 @@ def home():
 def predict():
     try:
         data = request.get_json()
-        levels = np.array(data["water_levels"]).reshape(1, -1, 1).astype(np.float32)
-        levels_tensor = torch.tensor(levels)
+        water_levels = np.array(data['water_levels']).astype(np.float32)
+
+        # Interpolate water levels to 40 points
+        wl40 = np.interp(np.linspace(1, 20, 40), np.arange(1, 21), water_levels)
+        wl_tensor = torch.tensor(wl40).reshape(1, 40, 1)  # [batch, seq_len, input_dim=1]
+
         with torch.no_grad():
-            pred = model(levels_tensor).numpy().flatten()
-            return jsonify({
-                "fs1": pred[:40].tolist(),
-                "fs2": pred[40:].tolist()
-            })
+            output = model(wl_tensor.float())
+
+        output = output.squeeze().numpy()
+        fs1_raw = output[:40]
+        fs2_raw = output[40:]
+
+        # === Detect high water level ===
+        if np.max(water_levels) > 25:
+            fs1_trimmed = fs1_raw[4:]
+            fs2_trimmed = fs2_raw[6:]
+        else:
+            fs1_trimmed = fs1_raw
+            fs2_trimmed = fs2_raw[4:]
+
+        # === Process FS values ===
+        fs1_processed = np.where(fs1_trimmed != 6, fs1_trimmed * 0.65, 5)
+        fs2_processed = np.where(fs2_trimmed != 6, fs2_trimmed * 0.6, 5)
+
+        # === Pad to 40 values ===
+        pad_len1 = 40 - len(fs1_processed)
+        pad_len2 = 40 - len(fs2_processed)
+
+        fs1_padding = fs1_processed[-1] + np.random.uniform(-0.05, 0.05, size=pad_len1)
+        fs2_padding = fs2_processed[-1] + np.random.uniform(-0.05, 0.05, size=pad_len2)
+
+        fs1 = np.concatenate([fs1_processed, fs1_padding])
+        fs2 = np.concatenate([fs2_processed, fs2_padding])
+
+        fs1 = np.clip(fs1, 0, 3)
+        fs2 = np.clip(fs2, 0, 3)
+
+        return jsonify({
+            'fs1': fs1.tolist(),
+            'fs2': fs2.tolist(),
+            'water_level': wl40.tolist()
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 # ====== Run Locally ======
 if __name__ == "__main__":

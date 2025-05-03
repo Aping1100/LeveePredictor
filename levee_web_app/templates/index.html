@@ -192,15 +192,17 @@ function predict() {
   }
   const waterData = interpolateWaterLevels(waterDataOriginal);
 
-console.log("📤 Sending fetch to /predict", waterDataOriginal);
+  const baseURL = location.hostname === "localhost"
+    ? "http://localhost:8080"
+    : "https://your-backend-url.railway.app"; // 🔁 把這裡改成你自己的 Railway 網址
 
-fetch('https://leveepredictor-production.up.railway.app/', {
+  console.log("📤 Sending fetch to", `${baseURL}/predict`, waterDataOriginal);
 
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ water_levels: waterDataOriginal })
-})
-
+  fetch(`${baseURL}/predict`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ water_levels: waterDataOriginal })
+  })
   .then(response => response.json())
   .then(data => {
     if (data.error) {
@@ -318,6 +320,7 @@ fetch('https://leveepredictor-production.up.railway.app/', {
     alert("❌ Network error: " + err.message);
   });
 }
+
 
 function downloadChart() {
   const link = document.createElement('a');

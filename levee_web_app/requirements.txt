@@ -1,5 +1,5 @@
-flask
+flask>=2.2.0
 flask-cors
-torch
+torch>=2.0.0
 gunicorn
 

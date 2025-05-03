@@ -190,13 +190,19 @@ function predict() {
     alert('Please enter exactly 20 water level values.');
     return;
   }
+
   const waterData = interpolateWaterLevels(waterDataOriginal);
 
-const baseURL = "https://leveepredictor-production.up.railway.app";
+  const baseURL = location.hostname === "localhost"
+    ? "http://localhost:8080"
+    : "https://leveepredictor-production.up.railway.app/";
 
-
-
-  console.log("📤 Sending fetch to", `${baseURL}/predict`, waterDataOriginal);
+  // 顯示 loading 提示
+  const loadingDiv = document.getElementById('loading-message');
+  const predictBtn = document.querySelector('.predict-btn');
+  loadingDiv.style.display = 'block';
+  predictBtn.disabled = true;
+  predictBtn.innerText = 'Predicting...';
 
   fetch(`${baseURL}/predict`, {
     method: 'POST',
@@ -205,21 +211,25 @@ const baseURL = "https://leveepredictor-production.up.railway.app";
   })
   .then(response => response.json())
   .then(data => {
+    loadingDiv.style.display = 'none';
+    predictBtn.disabled = false;
+    predictBtn.innerText = 'Predict';
+
     if (data.error) {
       alert("⚠️ Error: " + data.error);
       return;
     }
 
     document.getElementById('predict-result').style.display = 'block';
-    document.getElementById('predict-result').scrollIntoView({behavior: 'smooth'});
+    document.getElementById('predict-result').scrollIntoView({ behavior: 'smooth' });
 
     const ctx = document.getElementById('chartCanvas').getContext('2d');
     if (window.chart) window.chart.destroy();
 
-    const labels = Array.from({length: 40}, (_, i) => (i + 1) / 2);
+    const labels = Array.from({ length: 40 }, (_, i) => (i + 1) / 2);
     const fs1Data = data.fs1.map((v, i) => ({ x: labels[i], y: v }));
     const fs2Data = data.fs2.map((v, i) => ({ x: labels[i], y: v }));
-    const waterLevelData = waterData.map((v, i) => ({ x: labels[i], y: v }));
+    const waterLevelData = data.water_level.map((v, i) => ({ x: labels[i], y: v }));
 
     window.chart = new Chart(ctx, {
       type: 'line',
@@ -269,7 +279,7 @@ const baseURL = "https://leveepredictor-production.up.railway.app";
           },
           y: {
             min: 0,
-            max: 4,
+            max: 6,
             title: { display: true, text: 'FS' },
             position: 'left'
           },
@@ -283,7 +293,7 @@ const baseURL = "https://leveepredictor-production.up.railway.app";
         plugins: {
           tooltip: {
             callbacks: {
-              label: function(context) {
+              label: function (context) {
                 return `${context.dataset.label}: ${context.parsed.y.toFixed(2)}`;
               }
             }
@@ -296,7 +306,7 @@ const baseURL = "https://leveepredictor-production.up.railway.app";
                 yMax: 1,
                 borderColor: 'red',
                 borderWidth: 1,
-                borderDash: [6,6]
+                borderDash: [6, 6]
               }
             }
           }
@@ -317,6 +327,9 @@ const baseURL = "https://leveepredictor-production.up.railway.app";
     }
   })
   .catch(err => {
+    loadingDiv.style.display = 'none';
+    predictBtn.disabled = false;
+    predictBtn.innerText = 'Predict';
     alert("❌ Network error: " + err.message);
   });
 }

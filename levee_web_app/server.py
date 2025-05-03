@@ -1,30 +1,64 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-import requests
+import torch
+import torch.nn as nn
+import os
 
-app = Flask(__name__)
+# === Define model ===
+class FSHeavingModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.lstm = nn.LSTM(input_size=1, hidden_size=128, num_layers=3, batch_first=True)
+        self.fc = nn.Linear(128, 80)  # output 80 FS points (40 for fs1 + fs2)
+
+    def forward(self, x):
+        out, _ = self.lstm(x)
+        out = self.fc(out[:, -1, :])
+        return out
+
+# === Init app ===
+app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app)
 
-# === Serve index.html from templates ===
-@app.route('/')
-def home():
-    return render_template('index.html')  # ✅ 改這裡：從 templates 回傳 HTML
+# === Load model ===
+model = FSHeavingModel()
+model.load_state_dict(torch.load("model.pt", map_location=torch.device("cpu")))
+model.eval()
 
-# === Prediction proxy ===
+# === Serve index.html ===
+@app.route('/')
+def index():
+    return app.send_static_file('index.html')
+
+# === API Endpoint ===
 @app.route('/predict', methods=['POST'])
-def predict_proxy():
-    modal_url = 'https://aping1100--fs-heaving-api-serve.modal.run/predict'
+def predict():
     try:
-        resp = requests.post(modal_url, json=request.json, timeout=15)
-        resp.raise_for_status()
-        return jsonify(resp.json())
-    except requests.exceptions.HTTPError as http_err:
-        print(f"[ERROR] HTTPError: {http_err}")
-        print(f"[ERROR] Response text: {http_err.response.text}")
-        return jsonify({'error': f"Modal error {http_err.response.status_code}: {http_err.response.text}"}), 500
-    except requests.exceptions.RequestException as e:
-        print(f"[ERROR] RequestException: {e}")
+        data = request.get_json()
+        levels = data.get('water_levels', [])
+        if len(levels) != 20:
+            return jsonify({'error': '20 water level values required.'}), 400
+
+        # Interpolate to 40 points
+        interpolated = []
+        for i in range(19):
+            interpolated.append(levels[i])
+            interpolated.append((levels[i] + levels[i+1]) / 2)
+        interpolated.append(levels[-1])
+
+        input_tensor = torch.tensor(interpolated, dtype=torch.float32).view(1, -1, 1)
+
+        with torch.no_grad():
+            output = model(input_tensor).view(-1)
+
+        fs1 = output[:40].tolist()
+        fs2 = output[40:].tolist() if len(output) >= 80 else fs1  # fallback if only 40 outputs
+
+        return jsonify({'fs1': fs1, 'fs2': fs2})
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# === Start app ===
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080, debug=False)
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)

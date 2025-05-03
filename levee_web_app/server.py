@@ -44,10 +44,12 @@ def predict():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# === Home Page Check ===
-@app.route("/", methods=["GET"])
-def home():
-    return "✅ Levee Predictor backend is running."
+from flask import send_from_directory
+
+@app.route("/")
+def serve_index():
+    return send_from_directory("static", "index.html")
+
 
 # === Main Run ===
 if __name__ == "__main__":

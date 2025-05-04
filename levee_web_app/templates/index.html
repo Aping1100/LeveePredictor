@@ -1,14 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Future Levee Predictor</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://unpkg.com/chartjs-plugin-annotation@1.1.0"></script>
-  <style>
-    /* styles same as your original */
-  </style>
+<meta charset="UTF-8">
+<title>Future Levee Predictor</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/chartjs-plugin-annotation@1.1.0"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; margin: 0; padding: 0; }
+  .container { display: flex; flex-direction: row; height: 100vh; }
+  .sidebar { width: 30%; background: #f9f9f9; padding: 20px; overflow-y: auto; border-right: 1px solid #e0e0e0; }
+  .map-container { flex: 1.4; position: relative; }
+  #map { width: 100%; height: 100%; position: absolute; }
+  select, table, button { width: 100%; margin-top: 10px; padding: 8px; border-radius: 8px; }
+  .predict-btn, .download-btn { background-color: #6995c2; color: white; border: none; font-weight: bold; cursor: pointer; }
+  .predict-result { margin-top: 20px; background: white; padding: 16px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: none; }
+  table { border-collapse: collapse; }
+  td, th { border: 1px solid #ccc; padding: 6px; text-align: center; }
+</style>
 </head>
 <body>
 <div class="container">
@@ -35,88 +44,30 @@
     <div id="map"></div>
   </div>
 </div>
+
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
 <script>
-// === Your utility and setup functions (selectLevee, initializeTable, etc.) ===
-// ... unchanged from your version
+let chart;
 
-function predict() {
-  const waterDataOriginal = getTableData();
-  if (waterDataOriginal.length !== 20) {
-    alert('Please enter exactly 20 water level values.');
-    return;
-  }
-  const waterData = interpolateWaterLevels(waterDataOriginal);
-  const baseURL = location.hostname === "localhost"
-    ? "http://localhost:8080"
-    : "https://leveepredictor-production.up.railway.app/";
-  const loadingDiv = document.getElementById('loading-message');
-  const predictBtn = document.querySelector('.predict-btn');
-  loadingDiv.style.display = 'block';
-  predictBtn.disabled = true;
-  predictBtn.innerText = 'Predicting...';
+function initializeTable() {
+  const table = document.getElementById('water-table');
+  table.innerHTML = '<tr><th>Day</th><th>Level (ft)</th></tr>' +
+    Array.from({length: 20}, (_,i)=>
+      `<tr>
+        <td>${i+1}</td>
+        <td><input type="text" value="30" data-row="${i}" data-col="0" style="width:80px; text-align:center;"></td>
+      </tr>`).join('');
+}
 
-  fetch(`${baseURL}/predict`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ water_levels: waterDataOriginal })
-  })
-  .then(response => response.json())
-  .then(data => {
-    loadingDiv.style.display = 'none';
-    predictBtn.disabled = false;
-    predictBtn.innerText = 'Predict';
-    if (data.error) return alert("⚠️ Error: " + data.error);
-
-    document.getElementById('predict-result').style.display = 'block';
-    const ctx = document.getElementById('chartCanvas').getContext('2d');
-    if (window.chart) window.chart.destroy();
-
-    const labels = Array.from({ length: 40 }, (_, i) => (i + 1) / 2);
-    const fs1Data = data.fs1.map((v, i) => ({ x: labels[i], y: v }));
-    const fs2Data = data.fs2.map((v, i) => ({ x: labels[i], y: v }));
-    const waterLevelData = data.water_level.map((v, i) => ({ x: labels[i], y: v }));
-
-    window.chart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        datasets: [
-          { label: 'Toe of Levee', data: fs1Data, borderColor: '#cc0000', borderWidth: 1.5, pointRadius: 2, tension: 0.4 },
-          { label: 'Toe of Berm', data: fs2Data, borderColor: '#666666', borderWidth: 1.5, pointRadius: 2, tension: 0.4 },
-          { label: 'Water Level (ft)', data: waterLevelData, borderColor: 'lightblue', borderWidth: 1.5, pointRadius: 0, tension: 0.4, yAxisID: 'y1' }
-        ]
-      },
-      options: {
-        scales: {
-          x: { type: 'linear', title: { display: true, text: 'Day' }, min: 1, max: 20 },
-          y: { min: 0, max: 4, title: { display: true, text: 'FS' }, position: 'left' },
-          y1: { type: 'linear', position: 'right', title: { display: true, text: 'Water Level (ft)' }, grid: { drawOnChartArea: false } }
-        },
-        plugins: { annotation: { annotations: { line1: { type: 'line', yMin: 1, yMax: 1, borderColor: 'red', borderDash: [6, 6], borderWidth: 1 } } } }
-      }
-    });
-
-    const summary = document.getElementById('summary');
-    const fs1Danger = data.fs1.findIndex(v => v < 1);
-    const fs2Danger = data.fs2.findIndex(v => v < 1);
-    const firstDangerDay = Math.min(
-      fs1Danger >= 0 ? (fs1Danger + 1) / 2 : Infinity,
-      fs2Danger >= 0 ? (fs2Danger + 1) / 2 : Infinity
-    );
-    const peakWater = Math.max(...data.water_level);
-    let floodStage = peakWater >= 30 ? "🚨 Major" : peakWater >= 28 ? "⚠️ Moderate" : peakWater >= 22 ? "🌧 Minor" : "✅ Normal";
-    let recommendation = peakWater >= 30 ? "Rockfill and pumps." : peakWater >= 28 ? "Sandbags and watch." : "Monitor regularly.";
-    let zone = [];
-    if (fs1Danger >= 0) zone.push("toe of levee");
-    if (fs2Danger >= 0) zone.push("toe of berm");
-
-    const msgImg = `<div style='text-align:center'><img src='/static/images/levee_schematic.png' style='max-width:100%; height:auto; border:1px solid #ccc; border-radius:2px;'></div>`;
-
-    summary.innerHTML =
-      firstDangerDay < Infinity
-      ? `${msgImg}<span style='color:red;font-weight:bold;'>⚠️ Seepage Risk Detected</span><br><span style='color:gray;'>First issue: <b>Day ${firstDangerDay}</b> at <b>${zone.join(" and ")}</b>. Flood Stage: <b>${floodStage}</b><br><b>Do this:</b> ${recommendation}</span>`
-      : `${msgImg}<span style='color:green;font-weight:bold;'>✅ Safe</span><br><span style='color:gray;'>No stability issues detected. Go ahead and get coffee.</span>`;
+function getTableData() {
+  const table = document.getElementById('water-table');
+  const inputs = table.querySelectorAll('input');
+  const levels = [];
+  inputs.forEach(input => {
+    const value = parseFloat(input.value.trim());
+    levels.push(isNaN(value) ? 0 : value);
   });
+  return levels;
 }
 
 function downloadChart() {

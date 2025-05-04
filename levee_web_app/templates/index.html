@@ -1,23 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Future Levee Predictor</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://unpkg.com/chartjs-plugin-annotation@1.1.0"></script>
-<style>
-  body { font-family: 'Helvetica Neue', sans-serif; margin: 0; padding: 0; }
-  .container { display: flex; flex-direction: row; height: 100vh; }
-  .sidebar { width: 30%; background: #f9f9f9; padding: 20px; overflow-y: auto; border-right: 1px solid #e0e0e0; }
-  .map-container { flex: 1.4; position: relative; }
-  #map { width: 100%; height: 100%; position: absolute; }
-  select, table, button { width: 100%; margin-top: 10px; padding: 8px; border-radius: 8px; }
-  .predict-btn, .download-btn { background-color: #6995c2; color: white; border: none; font-weight: bold; cursor: pointer; }
-  .predict-result { margin-top: 20px; background: white; padding: 16px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: none; }
-  table { border-collapse: collapse; }
-  td, th { border: 1px solid #ccc; padding: 6px; text-align: center; }
-</style>
+  <meta charset="UTF-8">
+  <title>Future Levee Predictor</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/chartjs-plugin-annotation@1.1.0"></script>
+  <style>
+    body { font-family: 'Helvetica Neue', sans-serif; margin: 0; padding: 0; }
+    .container { display: flex; flex-direction: row; height: 100vh; }
+    .sidebar { width: 30%; background: #f9f9f9; padding: 20px; overflow-y: auto; border-right: 1px solid #e0e0e0; }
+    .map-container { flex: 1.4; position: relative; }
+    #map { width: 100%; height: 100%; position: absolute; }
+    select, table, button { width: 100%; margin-top: 10px; padding: 8px; border-radius: 8px; }
+    .predict-btn, .download-btn { background-color: #6995c2; color: white; border: none; font-weight: bold; cursor: pointer; }
+    .predict-result { margin-top: 20px; background: white; padding: 16px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: none; }
+    table { border-collapse: collapse; }
+    td, th { border: 1px solid #ccc; padding: 6px; text-align: center; }
+  </style>
 </head>
 <body>
 <div class="container">
@@ -44,40 +44,153 @@
     <div id="map"></div>
   </div>
 </div>
-
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
 <script>
-let chart;
+  let chart;
 
-function initializeTable() {
-  const table = document.getElementById('water-table');
-  table.innerHTML = '<tr><th>Day</th><th>Level (ft)</th></tr>' +
-    Array.from({length: 20}, (_,i)=>
-      `<tr>
-        <td>${i+1}</td>
-        <td><input type="text" value="30" data-row="${i}" data-col="0" style="width:80px; text-align:center;"></td>
-      </tr>`).join('');
-}
+  function initializeTable() {
+    const table = document.getElementById('water-table');
+    table.innerHTML = '<tr><th>Day</th><th>Level (ft)</th></tr>' +
+      Array.from({length: 20}, (_,i)=>`<tr><td>${i+1}</td><td><input type="text" value="30" data-row="${i}" style="width:80px; text-align:center;"></td></tr>`).join('');
+  }
 
-function getTableData() {
-  const table = document.getElementById('water-table');
-  const inputs = table.querySelectorAll('input');
-  const levels = [];
-  inputs.forEach(input => {
-    const value = parseFloat(input.value.trim());
-    levels.push(isNaN(value) ? 0 : value);
-  });
-  return levels;
-}
+  function getTableData() {
+    const inputs = document.querySelectorAll('#water-table input');
+    return Array.from(inputs).map(input => parseFloat(input.value.trim()) || 0);
+  }
 
-function downloadChart() {
-  const link = document.createElement('a');
-  link.download = 'levee_prediction_chart.png';
-  link.href = chart.toBase64Image();
-  link.click();
-}
+  function interpolateWaterLevels(data) {
+    const result = [];
+    for (let i = 0; i < data.length - 1; i++) {
+      result.push(data[i]);
+      result.push((data[i] + data[i+1]) / 2);
+    }
+    result.push(data[data.length - 1]);
+    return result;
+  }
 
-initializeTable();
+  function selectLevee(name) {
+    const marker = markers.find(m => m.getPopup().getContent().includes(name));
+    if (marker) {
+      map.setView(marker.getLatLng(), 17);
+      marker.openPopup();
+    }
+  }
+
+  function downloadChart() {
+    const link = document.createElement('a');
+    link.download = 'levee_prediction_chart.png';
+    link.href = chart.toBase64Image();
+    link.click();
+  }
+
+  function predict() {
+    const originalData = getTableData();
+    if (originalData.length !== 20) {
+      alert('Please enter exactly 20 water level values.');
+      return;
+    }
+    const data = interpolateWaterLevels(originalData);
+
+    const baseURL = location.hostname === "localhost" ? "http://localhost:8080" : "https://leveepredictor-production.up.railway.app/";
+    const loadingDiv = document.getElementById('loading-message');
+    const predictBtn = document.querySelector('.predict-btn');
+    loadingDiv.style.display = 'block';
+    predictBtn.disabled = true;
+    predictBtn.innerText = 'Predicting...';
+
+    fetch(`${baseURL}/predict`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ water_levels: originalData })
+    })
+    .then(response => response.json())
+    .then(data => {
+      loadingDiv.style.display = 'none';
+      predictBtn.disabled = false;
+      predictBtn.innerText = 'Predict';
+
+      const ctx = document.getElementById('chartCanvas').getContext('2d');
+      if (chart) chart.destroy();
+      const labels = Array.from({ length: 40 }, (_, i) => (i + 1) / 2);
+
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Toe of Levee',
+              data: data.fs1,
+              borderColor: '#cc0000',
+              backgroundColor: 'transparent',
+              pointRadius: 2
+            },
+            {
+              label: 'Toe of Berm',
+              data: data.fs2,
+              borderColor: '#666666',
+              backgroundColor: 'transparent',
+              pointRadius: 2
+            },
+            {
+              label: 'Water Level (ft)',
+              data: data.water_level,
+              yAxisID: 'y1',
+              borderColor: 'lightblue',
+              backgroundColor: 'transparent',
+              pointRadius: 0
+            }
+          ]
+        },
+        options: {
+          scales: {
+            x: { type: 'linear', title: { display: true, text: 'Day' } },
+            y: { min: 0, max: 4, title: { display: true, text: 'FS' } },
+            y1: { type: 'linear', position: 'right', title: { display: true, text: 'Water Level (ft)' }, grid: { drawOnChartArea: false } }
+          },
+          plugins: {
+            annotation: {
+              annotations: {
+                line1: {
+                  type: 'line',
+                  yMin: 1,
+                  yMax: 1,
+                  borderColor: 'red',
+                  borderWidth: 1,
+                  borderDash: [6, 6]
+                }
+              }
+            }
+          }
+        }
+      });
+
+      const dangerIndices = [];
+      data.fs1.forEach((v, i) => v < 1 && dangerIndices.push((i + 1) / 2));
+      data.fs2.forEach((v, i) => v < 1 && dangerIndices.push((i + 1) / 2));
+      const firstDanger = Math.min(...dangerIndices);
+      const summary = document.getElementById('summary');
+      summary.innerHTML = dangerIndices.length > 0 ?
+        `<span style='color:red;font-weight:bold;'>⚠️ Warning!</span> <span style='color:gray;'>First risk detected at Day ${firstDanger}. Immediate assessment recommended.</span>` :
+        `<span style='color:green;font-weight:bold;'>✅ Safe</span>`;
+    });
+  }
+
+  const map = L.map('map').setView([41.2877, -75.8678], 15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+  const leveeSites = [
+    {lat:41.2877, lng:-75.8678, name:"Site 2", image:"/static/images/site2.png"},
+    {lat:41.2608, lng:-75.8767, name:"Site 3", image:"/static/images/site3.png"},
+    {lat:41.2518, lng:-75.8872, name:"Site 4", image:"/static/images/site4.png"}
+  ];
+  let markers = leveeSites.map(site =>
+    L.marker([site.lat, site.lng]).addTo(map).bindPopup(`<div style="text-align:center;"><b>${site.name}</b><br>Coordinates: ${site.lat.toFixed(4)}, ${site.lng.toFixed(4)}<br><img src="${site.image}" style="width:150px; margin-top:5px; border-radius:8px;"></div>`)
+  );
+
+  initializeTable();
 </script>
 </body>
 </html>

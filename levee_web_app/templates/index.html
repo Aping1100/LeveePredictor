@@ -1,197 +1,435 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Future Levee Predictor</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://unpkg.com/chartjs-plugin-annotation@1.1.0"></script>
-  <style>
-    body { font-family: 'Helvetica Neue', sans-serif; margin: 0; padding: 0; }
-    .container { display: flex; flex-direction: row; height: 100vh; }
-    .sidebar { width: 30%; background: #f9f9f9; padding: 20px; overflow-y: auto; border-right: 1px solid #e0e0e0; }
-    .map-container { flex: 1.4; position: relative; }
-    #map { width: 100%; height: 100%; position: absolute; }
-    select, table, button { width: 100%; margin-top: 10px; padding: 8px; border-radius: 8px; }
-    .predict-btn, .download-btn { background-color: #6995c2; color: white; border: none; font-weight: bold; cursor: pointer; }
-    .predict-result { margin-top: 20px; background: white; padding: 16px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: none; }
-    table { border-collapse: collapse; }
-    td, th { border: 1px solid #ccc; padding: 6px; text-align: center; }
-  </style>
+<meta charset="UTF-8">
+<title>Future Levee Predictor</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/chartjs-plugin-annotation@1.1.0"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; margin: 0; padding: 0; }
+  .container { display: flex; flex-direction: row; height: 100vh; }
+  .sidebar { width: 30%; background: #f9f9f9; padding: 20px; overflow-y: auto; border-right: 1px solid #e0e0e0; }
+  .map-container { flex: 1.4; position: relative; }
+  #map { width: 100%; height: 100%; position: absolute; }
+  select, table, button { width: 100%; margin-top: 10px; padding: 8px; border-radius: 8px; }
+  .predict-btn, .download-btn { background-color: #6995c2; color: white; border: none; font-weight: bold; cursor: pointer; }
+  .predict-result { margin-top: 20px; background: white; padding: 16px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: none; }
+  table { border-collapse: collapse; }
+  td, th { border: 1px solid #ccc; padding: 6px; text-align: center; }
+
+.levee-select {
+  width: 100%; /* 拉到滿版 */
+  padding: 8px;
+  font-size: 16px;
+  color: #6c7a89; /* 灰藍色文字 */
+  border: 2px solid #6c7a89; /* 灰藍色邊框 */
+  border-radius: 8px; /* 邊角圓圓 */
+  background-color: white; /* 背景白色 */
+  appearance: none; /* 移除預設系統樣式（更一致） */
+  -webkit-appearance: none; /* Safari用 */
+  -moz-appearance: none; /* Firefox用 */
+}
+
+.levee-select:focus {
+  border-color: #5f9ea0; /* 點選時，邊框變亮一點的藍色 */
+  outline: none;
+}
+
+
+
+  .levee-title {
+  color: #6995c2; /* 灰藍色字體 */
+  font-size: 28px; /* 字體大小 */
+  font-weight: bold; /* 字體加粗 */
+  text-align: center; /* 置中對齊 */
+  margin-top: 20px; /* 上方留空 */
+  margin-bottom: 10px; /* 下方留空 */
+  font-family: 'Helvetica Neue', sans-serif; /* 字體族 */
+}
+
+
+  .water-table-wrapper {
+  max-height: 300px; /* 看你想多高，可以自己調，像250px或200px也行 */
+  overflow-y: auto; /* 只出現垂直的捲軸 */
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  margin-top: 10px;
+}
+#water-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #6388ad;
+}
+#water-table td, #water-table th {
+  border: 1px solid #ccc;
+  padding: 6px;
+  text-align: center;
+}
+</style>
 </head>
 <body>
 <div class="container">
   <div class="sidebar">
     <h2 class="levee-title">Levee Predictor</h2>
-    <select class="levee-select" onchange="selectLevee(this.value)">
-      <option value="">Select site</option>
-      <option value="Site 2">Site 2</option>
-      <option value="Site 3">Site 3</option>
-      <option value="Site 4">Site 4</option>
-    </select>
+
+      <select class="levee-select" onchange="selectLevee(this.value)">
+        <option value="">Select site</option>
+        <option value="Site 2">Site 2</option>
+        <option value="Site 3">Site 3</option>
+        <option value="Site 4">Site 4</option>
+      </select>
+
     <div class="water-table-wrapper">
-      <table id="water-table"></table>
-    </div>
+  <table id="water-table"></table>
+</div>
     <button class="predict-btn" onclick="predict()">Predict</button>
-    <div id="loading-message" style="display:none; margin-top:2px; text-align:center; color:gray;">Please wait...</div>
     <div id="predict-result" class="predict-result">
-      <canvas id="chartCanvas" width="400" height="300"></canvas>
+      <canvas id="chartCanvas" width="300" height="150"></canvas>
       <button class="download-btn" onclick="downloadChart()">Download Chart</button>
-      <div id="summary" style="margin-top:2px; font-size:16px;"></div>
+      <div id="summary" style="margin-top:10px; font-size:14px;"></div>
     </div>
   </div>
   <div class="map-container">
     <div id="map"></div>
   </div>
 </div>
+
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
 <script>
-  let chart;
+const map = L.map('map').setView([41.2877, -75.8678], 15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+const leveeSites = [
+  {lat:41.2877, lng:-75.8678, name:"Site 2", image:"/static/images/site2.png"},
+  {lat:41.2608, lng:-75.8767, name:"Site 3", image:"/static/images/site3.png"},
+  {lat:41.2518, lng:-75.8872, name:"Site 4", image:"/static/images/site4.png"}
+];
 
-  function initializeTable() {
-    const table = document.getElementById('water-table');
-    table.innerHTML = '<tr><th>Day</th><th>Level (ft)</th></tr>' +
-      Array.from({length: 20}, (_,i)=>`<tr><td>${i+1}</td><td><input type="text" value="30" data-row="${i}" style="width:80px; text-align:center;"></td></tr>`).join('');
+let markers = leveeSites.map(site =>
+  L.marker([site.lat, site.lng]).addTo(map).bindPopup(`
+    <div style="text-align:center;">
+      <b>${site.name}</b><br>
+      Coordinates: ${site.lat.toFixed(4)}, ${site.lng.toFixed(4)}<br>
+      <img src="${site.image}" alt="Site Image" style="width:350px; margin-top:1px; border-radius:4px;">
+    </div>
+  `, { maxWidth: 350 })  // ← 這裡加 popup 選項
+);
+
+
+
+function selectLevee(name) {
+  const marker = markers.find(m => m.getPopup().getContent().includes(name));
+  if (marker) {
+    map.setView(marker.getLatLng(), 17);
+    marker.openPopup();
   }
+}
 
-  function getTableData() {
-    const inputs = document.querySelectorAll('#water-table input');
-    return Array.from(inputs).map(input => parseFloat(input.value.trim()) || 0);
-  }
+function initializeTable() {
+  const table = document.getElementById('water-table');
+  table.innerHTML = '<tr><th>Day</th><th>Level (ft)</th></tr>' +
+    Array.from({length: 20}, (_, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td><input type="text" value="30" data-row="${i}" data-col="0" style="width:80px; text-align:center;"></td>
+      </tr>`).join('');
+}
 
-  function interpolateWaterLevels(data) {
-    const result = [];
-    for (let i = 0; i < data.length - 1; i++) {
-      result.push(data[i]);
-      result.push((data[i] + data[i+1]) / 2);
+// ✅ 只保留這一個 keydown handler（含自動全選）
+document.addEventListener('keydown', function(e) {
+  const active = document.activeElement;
+  if (active && active.tagName === 'INPUT' && active.closest('#water-table')) {
+    const row = parseInt(active.dataset.row);
+    const col = parseInt(active.dataset.col);
+    let target;
+
+    if (e.key === 'ArrowDown') {
+      target = document.querySelector(`input[data-row="${row + 1}"][data-col="${col}"]`);
+    } else if (e.key === 'ArrowUp') {
+      target = document.querySelector(`input[data-row="${row - 1}"][data-col="${col}"]`);
     }
-    result.push(data[data.length - 1]);
-    return result;
-  }
 
-  function selectLevee(name) {
-    const marker = markers.find(m => m.getPopup().getContent().includes(name));
-    if (marker) {
-      map.setView(marker.getLatLng(), 17);
-      marker.openPopup();
+    if (target) {
+      e.preventDefault();  // 防止畫面捲動
+      target.focus();
+      target.select();     // ✅ 自動全選內容
     }
   }
+});
 
-  function downloadChart() {
-    const link = document.createElement('a');
-    link.download = 'levee_prediction_chart.png';
-    link.href = chart.toBase64Image();
-    link.click();
+// ✅ Paste handler：支援從 Excel 複製多筆數據貼上
+document.addEventListener('paste', function(e) {
+  const active = document.activeElement;
+  if (active && active.tagName === 'INPUT' && active.closest('#water-table')) {
+    e.preventDefault();
+    const clipboardData = e.clipboardData || window.clipboardData;
+    const pastedData = clipboardData.getData('text');
+
+    const values = pastedData.split(/\r?\n/).map(v => v.trim()).filter(v => v !== '');
+    let row = parseInt(active.dataset.row);
+
+    values.forEach((val, idx) => {
+      const targetInput = document.querySelector(`input[data-row="${row + idx}"][data-col="0"]`);
+      if (targetInput) {
+        targetInput.value = val;
+      }
+    });
   }
+});
 
-  function predict() {
-    const originalData = getTableData();
-    if (originalData.length !== 20) {
-      alert('Please enter exactly 20 water level values.');
-      return;
-    }
-    const data = interpolateWaterLevels(originalData);
+initializeTable();  // 別忘了初始化表格！
 
-    const baseURL = location.hostname === "localhost" ? "http://localhost:8080" : "https://leveepredictor-production.up.railway.app/";
-    const loadingDiv = document.getElementById('loading-message');
-    const predictBtn = document.querySelector('.predict-btn');
-    loadingDiv.style.display = 'block';
-    predictBtn.disabled = true;
-    predictBtn.innerText = 'Predicting...';
 
-    fetch(`${baseURL}/predict`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ water_levels: originalData })
-    })
-    .then(response => response.json())
-    .then(data => {
-      loadingDiv.style.display = 'none';
-      predictBtn.disabled = false;
-      predictBtn.innerText = 'Predict';
+function getTableData() {
+  const table = document.getElementById('water-table');
+  const inputs = table.querySelectorAll('input');
+  const levels = [];
+  inputs.forEach(input => {
+    const value = parseFloat(input.value.trim());
+    levels.push(isNaN(value) ? 0 : value);
+  });
+  return levels;
+}
 
-      const ctx = document.getElementById('chartCanvas').getContext('2d');
-      if (chart) chart.destroy();
-      const labels = Array.from({ length: 40 }, (_, i) => (i + 1) / 2);
 
-      chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [
-            {
-              label: 'Toe of Levee',
-              data: data.fs1,
-              borderColor: '#cc0000',
-              backgroundColor: 'transparent',
-              pointRadius: 2
-            },
-            {
-              label: 'Toe of Berm',
-              data: data.fs2,
-              borderColor: '#666666',
-              backgroundColor: 'transparent',
-              pointRadius: 2
-            },
-            {
-              label: 'Water Level (ft)',
-              data: data.water_level,
-              yAxisID: 'y1',
-              borderColor: 'lightblue',
-              backgroundColor: 'transparent',
-              pointRadius: 0
-            }
-          ]
-        },
-        options: {
-          scales: {
-            x: { type: 'linear', title: { display: true, text: 'Day' } },
-            y: { min: 0, max: 4, title: { display: true, text: 'FS' } },
-            y1: { type: 'linear', position: 'right', title: { display: true, text: 'Water Level (ft)' }, grid: { drawOnChartArea: false } }
+function interpolateWaterLevels(data) {
+  const result = [];
+  for (let i = 0; i < data.length - 1; i++) {
+    const start = data[i];
+    const end = data[i+1];
+    result.push(start);
+    result.push((start + end) / 2);
+  }
+  result.push(data[data.length-1]);
+  return result;
+}
+
+function predict() {
+  const waterDataOriginal = getTableData();
+  if (waterDataOriginal.length !== 20) {
+    alert('Please enter exactly 20 water level values.');
+    return;
+  }
+  const waterData = interpolateWaterLevels(waterDataOriginal);
+
+  fetch('/predict', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ water_levels: waterDataOriginal })
+  })
+  .then(response => response.json())
+  .then(data => {
+    document.getElementById('predict-result').style.display = 'block';
+    document.getElementById('predict-result').scrollIntoView({behavior: 'smooth'});
+
+    const ctx = document.getElementById('chartCanvas').getContext('2d');
+    if (window.chart) window.chart.destroy();
+
+    const labels = Array.from({length: 40}, (_, i) => (i + 1) / 2);
+
+    const fs1Data = data.fs1.map((v, i) => ({ x: labels[i], y: v }));
+    const fs2Data = data.fs2.map((v, i) => ({ x: labels[i], y: v }));
+    const waterLevelData = waterData.map((v, i) => ({ x: labels[i], y: v }));
+
+    window.chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        datasets: [
+          {
+            label: 'Toe of Levee',
+            data: fs1Data,
+            parsing: true,
+            backgroundColor: data.fs1.map(v => v < 1 ? '#cc0000' : '#cccccc'),
+            borderColor: data.fs1.map(v => v < 1 ? '#cc0000' : '#cccccc'),
+            borderWidth: 1.5,
+            pointRadius: 2,
+            tension: 0.4
           },
-          plugins: {
-            annotation: {
-              annotations: {
-                line1: {
-                  type: 'line',
-                  yMin: 1,
-                  yMax: 1,
-                  borderColor: 'red',
-                  borderWidth: 1,
-                  borderDash: [6, 6]
-                }
+          {
+            label: 'Toe of Berm',
+            data: fs2Data,
+            parsing: true,
+            backgroundColor: data.fs2.map(v => v < 1 ? '#cc0000' : '#666666'),
+            borderColor: data.fs2.map(v => v < 1 ? '#cc0000' : '#666666'),
+            borderWidth: 1.5,
+            pointRadius: 2,
+            tension: 0.4
+          },
+          {
+            label: 'Water Level (ft)',
+            data: waterLevelData,
+            parsing: true,
+            borderColor: 'lightblue',
+            backgroundColor: 'lightblue',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            tension: 0.4,
+            yAxisID: 'y1'
+          }
+        ]
+      },
+      options: {
+        scales: {
+          x: {
+            type: 'linear',
+            title: { display: true, text: 'Day' },
+            ticks: { stepSize: 1, callback: val => Number.isInteger(val) ? val : '' },
+            min: 1,
+            max: 20
+          },
+          y: {
+            min: 0,
+            max: 4,
+            title: { display: true, text: 'FS' },
+            position: 'left'
+          },
+          y1: {
+            type: 'linear',
+            position: 'right',
+            title: { display: true, text: 'Water Level (ft)' },
+            grid: { drawOnChartArea: false }
+          }
+        },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return `${context.dataset.label}: ${context.parsed.y.toFixed(2)}`;
+              }
+            }
+          },
+          annotation: {
+            annotations: {
+              line1: {
+                type: 'line',
+                yMin: 1,
+                yMax: 1,
+                borderColor: 'red',
+                borderWidth: 1,
+                borderDash: [6,6]
               }
             }
           }
         }
-      });
-
-      const dangerIndices = [];
-      data.fs1.forEach((v, i) => v < 1 && dangerIndices.push((i + 1) / 2));
-      data.fs2.forEach((v, i) => v < 1 && dangerIndices.push((i + 1) / 2));
-      const firstDanger = Math.min(...dangerIndices);
-      const summary = document.getElementById('summary');
-      summary.innerHTML = dangerIndices.length > 0 ?
-        `<span style='color:red;font-weight:bold;'>⚠️ Warning!</span> <span style='color:gray;'>First risk detected at Day ${firstDanger}. Immediate assessment recommended.</span>` :
-        `<span style='color:green;font-weight:bold;'>✅ Safe</span>`;
+      }
     });
+
+    const dangerIndices = [];
+    data.fs1.forEach((v, i) => { if (v < 1) dangerIndices.push((i + 1) / 2); });
+    data.fs2.forEach((v, i) => { if (v < 1) dangerIndices.push((i + 1) / 2); });
+
+    const fs1Danger = data.fs1.findIndex(v => v < 1);
+    const fs2Danger = data.fs2.findIndex(v => v < 1);
+    const firstDangerDay = Math.min(
+      fs1Danger >= 0 ? (fs1Danger + 1) / 2 : Infinity,
+      fs2Danger >= 0 ? (fs2Danger + 1) / 2 : Infinity
+    );
+
+    const peakWater = Math.max(...data.water_level);
+    let floodStage = "";
+    let recommendation = "";
+
+    if (peakWater >= 30) {
+      floodStage = "🚨 Major Flood Stage";
+      recommendation = "Deploy heavy rockfill, toe-weight berms, and prep emergency pumps. Also, maybe alert someone with a radio and a helmet.";
+    } else if (peakWater >= 28) {
+      floodStage = "⚠️ Moderate Flood Stage";
+      recommendation = "Sandbags, toe reinforcement, and a very alert night shift are advised.";
+    } else if (peakWater >= 22) {
+      floodStage = "🌧 Minor Flood Stage";
+      recommendation = "Routine patrols and sandbag placement should be enough — but stay sharp.";
+    } else {
+      floodStage = "✅ Normal Conditions";
+      recommendation = "System looks stable. You may relax, but don’t unpack the evacuation plan just yet.";
+    }
+
+    let failureZone = [];
+    if (fs1Danger >= 0) failureZone.push("toe of levee");
+    if (fs2Danger >= 0) failureZone.push("toe of berm");
+
+    const failureMessage = `
+      <div style="text-align:center; margin-bottom:10px;">
+        <img src="/static/images/levee_schematic.png"
+             alt="Levee Diagram"
+             style="max-width:60%; height:auto; border:0px solid #ccc; border-radius:2px;" />
+      </div>
+    `;
+
+    const summary = document.getElementById('summary');
+    if (firstDangerDay < Infinity) {
+      summary.innerHTML = `
+        ${failureMessage}
+        <span style='color:red;font-weight:bold;'>⚠️ Seepage Risk Detected</span><br/>
+        <span style='color:gray;'>
+          First failure expected at <b>Day ${firstDangerDay}</b> near the <b>${failureZone.join(" and ")}</b>.<br/>
+          Current peak water level: <b>${floodStage}</b><br/><br/>
+          Potential consequences include <i>piping, heaving, sand boils</i>, and local slope failure.<br/><br/>
+          <b>Recommended Response:</b><br/>
+          ${recommendation}
+        </span>
+      `;
+    } else {
+      summary.innerHTML = `
+        ${failureMessage}
+        <span style='color:green;font-weight:bold;'>✅ Safe</span><br/>
+        <span style='color:gray;'>No signs of instability at either levee or berm toes. All systems holding steady... for now.</span>
+      `;
+
+
+    }
+  });
+}
+
+function downloadChart() {
+  const link = document.createElement('a');
+  link.download = 'levee_prediction_chart.png';
+  link.href = chart.toBase64Image();
+  link.click();
+}
+
+// === Initialize water table ===
+initializeTable();
+
+// === Add keyboard navigation for water table ===
+document.addEventListener('keydown', function(e) {
+  const active = document.activeElement;
+  if (active && active.tagName === 'TD' && active.isContentEditable) {
+    const currentCell = active;
+    const currentRow = currentCell.parentElement;
+    const table = document.getElementById('water-table');
+    const rows = Array.from(table.querySelectorAll('tr')).slice(1); // skip header
+    const rowIndex = rows.indexOf(currentRow);
+    const cellIndex = Array.from(currentRow.children).indexOf(currentCell);
+
+    let nextCell = null;
+
+    if (e.key === 'Enter' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (rowIndex + 1 < rows.length) {
+        nextCell = rows[rowIndex + 1].children[cellIndex];
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (rowIndex - 1 >= 0) {
+        nextCell = rows[rowIndex - 1].children[cellIndex];
+      }
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      if (cellIndex + 1 < currentRow.children.length) {
+        nextCell = currentRow.children[cellIndex + 1];
+      }
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      if (cellIndex - 1 >= 0) {
+        nextCell = currentRow.children[cellIndex - 1];
+      }
+    }
+
+    if (nextCell && nextCell.isContentEditable) {
+      nextCell.focus();
+    }
   }
-
-  const map = L.map('map').setView([41.2877, -75.8678], 15);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
-  const leveeSites = [
-    {lat:41.2877, lng:-75.8678, name:"Site 2", image:"/static/images/site2.png"},
-    {lat:41.2608, lng:-75.8767, name:"Site 3", image:"/static/images/site3.png"},
-    {lat:41.2518, lng:-75.8872, name:"Site 4", image:"/static/images/site4.png"}
-  ];
-  let markers = leveeSites.map(site =>
-    L.marker([site.lat, site.lng]).addTo(map).bindPopup(`<div style="text-align:center;"><b>${site.name}</b><br>Coordinates: ${site.lat.toFixed(4)}, ${site.lng.toFixed(4)}<br><img src="${site.image}" style="width:150px; margin-top:5px; border-radius:8px;"></div>`)
-  );
-
-  initializeTable();
+});
 </script>
 </body>
 </html>

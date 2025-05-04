@@ -319,19 +319,51 @@ function predict() {
     data.fs2.forEach((v, i) => { if (v < 1) dangerIndices.push((i + 1) / 2); });
 
     const summary = document.getElementById('summary');
-    if (dangerIndices.length > 0) {
-      const firstDangerDay = Math.min(...dangerIndices);
-      summary.innerHTML = `<span style='color:red;font-weight:bold;'>⚠️ Warning!</span><span style='color:gray;'> Potential seepage failure first detected at Day ${firstDangerDay}. Consequences may include piping, heaving, sand boils, and local collapse of levee structures. Immediate engineering assessment and mitigation actions are highly recommended.</span>`;
-    } else {
-      summary.innerHTML = `<span style='color:green;font-weight:bold;'>✅ Safe</span>`;
-    }
-  })
-  .catch(err => {
-    loadingDiv.style.display = 'none';
-    predictBtn.disabled = false;
-    predictBtn.innerText = 'Predict';
-    alert("❌ Network error: " + err.message);
-  });
+const fs1Danger = data.fs1.findIndex(v => v < 1);
+const fs2Danger = data.fs2.findIndex(v => v < 1);
+const firstDangerDay = Math.min(
+  fs1Danger >= 0 ? (fs1Danger + 1) / 2 : Infinity,
+  fs2Danger >= 0 ? (fs2Danger + 1) / 2 : Infinity
+);
+
+const peakWater = Math.max(...data.water_level);
+let floodStage = "";
+let recommendation = "";
+
+if (peakWater >= 30) {
+  floodStage = "🚨 Major Flood Stage";
+  recommendation = "Deploy heavy rockfill, toe-weight berms, and prep emergency pumps. Also, maybe alert someone with a radio and a hat.";
+} else if (peakWater >= 28) {
+  floodStage = "⚠️ Moderate Flood Stage";
+  recommendation = "Sandbags, toe reinforcement, and a very alert night shift are advised.";
+} else if (peakWater >= 22) {
+  floodStage = "🌧 Minor Flood Stage";
+  recommendation = "Routine patrols and sandbag placement should be enough, but stay sharp.";
+} else {
+  floodStage = "✅ Normal Conditions";
+  recommendation = "System looks good. Maybe go grab that coffee—but keep your boots nearby.";
+}
+
+if (firstDangerDay < Infinity) {
+  let failureZone = [];
+  if (fs1Danger >= 0) failureZone.push("toe of levee");
+  if (fs2Danger >= 0) failureZone.push("toe of berm");
+
+  summary.innerHTML = `
+    <span style='color:red;font-weight:bold;'>⚠️ Seepage Risk Detected</span><br/>
+    <span style='color:gray;'>
+      First failure expected at <b>Day ${firstDangerDay}</b> near the <b>${failureZone.join(" and ")}</b>.<br/>
+      Current peak water level places the system in: <b>${floodStage}</b><br/><br/>
+      Potential consequences include <i>piping, heaving, sand boils</i>, and localized slope collapse.<br/><br/>
+      <b>Recommended Response:</b><br/>
+      ${recommendation}
+    </span>
+  `;
+} else {
+  summary.innerHTML = `
+    <span style='color:green;font-weight:bold;'>✅ Safe</span><br/>
+    <span style='color:gray;'>No signs of instability at either levee or berm toes. The system is holding. For now.</span>
+  `;
 }
 
 

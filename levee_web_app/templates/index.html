@@ -313,7 +313,7 @@ function predict() {
         }
       }
     });
-
+  }
     const dangerIndices = [];
     data.fs1.forEach((v, i) => { if (v < 1) dangerIndices.push((i + 1) / 2); });
     data.fs2.forEach((v, i) => { if (v < 1) dangerIndices.push((i + 1) / 2); });
@@ -428,7 +428,7 @@ document.addEventListener('keydown', function(e) {
     }
   }
 });
-    }
+    
 </script>
 </body>
 </html>

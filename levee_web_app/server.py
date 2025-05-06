@@ -56,7 +56,7 @@ def predict():
             fs1_trimmed = fs1_raw
             fs2_trimmed = fs2_raw[4:]
 
-        fs1_processed = np.where(fs1_trimmed != 6, fs1_trimmed * 0.65, 5)
+        fs1_processed = np.where(fs1_trimmed != 6, fs1_trimmed * 0.7, 5)
         fs2_processed = np.where(fs2_trimmed != 6, fs2_trimmed * 0.6, 5)
 
         pad_len1 = 40 - len(fs1_processed)

@@ -98,26 +98,58 @@
     <div id="map"></div>
   </div>
 </div>
-
+<div id="img-modal" style="
+  display:none;
+  position:fixed;
+  top:0; left:0; right:0; bottom:0;
+  background: rgba(0, 0, 0, 0.85);
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+" onclick="closeFullscreen()">
+  <img id="img-modal-content" style="max-width:90%; max-height:90%; border-radius:6px;" />
+</div>
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
 <script>
 const map = L.map('map').setView([41.2877, -75.8678], 15);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
 const leveeSites = [
-  {lat:41.2877, lng:-75.8678, name:"Site 2", image:"/static/images/site2.png"},
-  {lat:41.2608, lng:-75.8767, name:"Site 3", image:"/static/images/site3.png"},
-  {lat:41.2518, lng:-75.8872, name:"Site 4", image:"/static/images/site4.png"}
+  {lat:41.2877, lng:-75.8678, name:"Site 2", images:["/static/images/site2.png","/static/images/site2_3.png",
+  "/static/images/site2_2.png","/static/images/site2_4.png","/static/images/site2_5.png"]},
+  {lat:41.2608, lng:-75.8767, name:"Site 3", images:["/static/images/site3.png","/static/images/site3_2.png","/static/images/site3_3.png"]},
+  {lat:41.2518, lng:-75.8872, name:"Site 4", images:["/static/images/site4.png","/static/images/site4_2.png","/static/images/site4_3.png"]}
 ];
 
-let markers = leveeSites.map(site =>
-  L.marker([site.lat, site.lng]).addTo(map).bindPopup(`
-    <div style="text-align:center;">
-      <b>${site.name}</b><br>
-      Coordinates: ${site.lat.toFixed(4)}, ${site.lng.toFixed(4)}<br>
-      <img src="${site.image}" alt="Site Image" style="width:350px; margin-top:1px; border-radius:4px;">
+let markers = leveeSites.map(site => {
+  const imageHTML = site.images.map((img, i) =>
+    `<img src="${img}" alt="Site Image ${i+1}"
+          class="popup-img"
+          style="width:100%; margin-bottom:10px; border-radius:10px; cursor:pointer;"
+          onclick="openFullscreen('${img}')">`
+  ).join('');
+
+  return L.marker([site.lat, site.lng]).addTo(map).bindPopup(`
+    <div style="text-align:center; width:350px;">
+      <div style="font-weight:bold; font-size:16px; margin-bottom:5px;">${site.name}</div>
+      <div style="color:#555;">Coordinates: ${site.lat.toFixed(4)}, ${site.lng.toFixed(4)}</div>
+      <div style="max-height:210px; overflow-y:auto; margin-top:10px;">
+        ${imageHTML}
+      </div>
     </div>
-  `, { maxWidth: 350 })  // ← 這裡加 popup 選項
-);
+  `, { maxWidth: 340 });
+});
+
+
+function openFullscreen(src) {
+  const modal = document.getElementById('img-modal');
+  const img = document.getElementById('img-modal-content');
+  img.src = src;
+  modal.style.display = 'flex';
+}
+
+function closeFullscreen() {
+  document.getElementById('img-modal').style.display = 'none';
+}
 
 
 

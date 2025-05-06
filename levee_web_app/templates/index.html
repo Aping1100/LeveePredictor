@@ -84,6 +84,10 @@
   <table id="water-table"></table>
 </div>
     <button class="predict-btn" onclick="predict()">Predict</button>
+     <div id="loading" style="display:none; text-align:center; margin-top:10px;">
+  <div class="spinner" style="margin-bottom:5px;"></div>
+  <span style="font-weight:bold; color:#6995c2;">Predicting... Please wait</span>
+</div>
     <div id="predict-result" class="predict-result">
       <canvas id="chartCanvas" width="300" height="150"></canvas>
       <button class="download-btn" onclick="downloadChart()">Download Chart</button>
@@ -104,17 +108,6 @@ const leveeSites = [
   {lat:41.2608, lng:-75.8767, name:"Site 3", image:"/static/images/site3.png"},
   {lat:41.2518, lng:-75.8872, name:"Site 4", image:"/static/images/site4.png"}
 ];
-  const preloadImages = () => {
-    const imagePaths = [
-      "/static/images/site2.png",
-      "/static/images/site3.png",
-      "/static/images/site4.png"
-    ];
-    imagePaths.forEach(path => {
-      const img = new Image();
-      img.src = path;
-    });
-  };
 
 let markers = leveeSites.map(site =>
   L.marker([site.lat, site.lng]).addTo(map).bindPopup(`
@@ -222,6 +215,8 @@ function predict() {
     return;
   }
   const waterData = interpolateWaterLevels(waterDataOriginal);
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('predict-result').style.display = 'none';
 
   fetch('/predict', {
     method: 'POST',
@@ -230,17 +225,21 @@ function predict() {
   })
   .then(response => response.json())
   .then(data => {
+    document.getElementById('loading').style.display = 'none';
     document.getElementById('predict-result').style.display = 'block';
     document.getElementById('predict-result').scrollIntoView({behavior: 'smooth'});
 
     const ctx = document.getElementById('chartCanvas').getContext('2d');
     if (window.chart) window.chart.destroy();
 
-    const labels = Array.from({length: 40}, (_, i) => (i + 1) / 2);
+    const labelsFS = Array.from({length: 40}, (_, i) => (i + 1) / 2);  // for FS
+    const labelsWL = Array.from({length: 20}, (_, i) => i + 1);       // for water level
 
-    const fs1Data = data.fs1.map((v, i) => ({ x: labels[i], y: v }));
-    const fs2Data = data.fs2.map((v, i) => ({ x: labels[i], y: v }));
-    const waterLevelData = waterData.map((v, i) => ({ x: labels[i], y: v }));
+    const fs1Data = data.fs1.map((v, i) => ({ x: labelsFS[i], y: v }));
+    const fs2Data = data.fs2.map((v, i) => ({ x: labelsFS[i], y: v }));
+    const waterLevelData = waterDataOriginal.map((v, i) => ({ x: labelsWL[i], y: v }));
+
+
 
     window.chart = new Chart(ctx, {
       type: 'line',
